@@ -707,7 +707,16 @@ class PreciseAlignComposite:
     def composite(self, original_image, edited_image, mask, invert_mask=False, feather=0,
                   curve="smoothstep", color_match=False, color_strength=0.8):
         if original_image.shape != edited_image.shape:
-            raise ValueError("PreciseAlignComposite: 两张图尺寸不一致，请先把 Crop Back 接在解码之后。")
+            ow, oh = int(original_image.shape[2]), int(original_image.shape[1])
+            ew, eh = int(edited_image.shape[2]), int(edited_image.shape[1])
+            raise ValueError(
+                f"PreciseAlignComposite: 尺寸不一致：original_image={ow}x{oh}，"
+                f"edited_image={ew}x{eh}。\n"
+                "edited_image 必须接 Precise Align · Crop Back 的 image 输出（原图尺寸）；"
+                "original_image 必须接原图（Load Image）；"
+                "mask 建议接 Crop Back 的 mask 输出。\n"
+                "不要把 VAE Decode 的画布图或 Pad.image 直接接进 Composite。"
+            )
         edited_image = edited_image.to(device=original_image.device, dtype=original_image.dtype)
         b, h, w, c = original_image.shape
         m = mask
