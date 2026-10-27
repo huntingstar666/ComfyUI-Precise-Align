@@ -150,7 +150,7 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 `box_x/y/w/h` 是联合包围盒，接上也无害，但 `mask` 优先（只接 image + mask 即可）。
 遮罩坐标按原图记录，节点内部会随缩放/补边自动映射。
 
-> 如果提示“预览图加载失败”：确认 `image` 已接图，然后点一次工作区的“运行”（本节点是输出节点，会生成预览）。仍失败时按 F12 打开 Console，把 `[PreciseAlignRegion]` 开头的日志发出来。
+> 编辑器预览图保存在 ComfyUI 的 temp 目录，**ComfyUI 启动时会清理 temp**，所以重启后旧预览会失效；此时再点按钮会自动**只执行本节点及上游**重新生成，无需手动运行。仍失败时按 F12 打开 Console，把 `[PreciseAlignRegion]` 开头的日志发出来。
 
 
 ---

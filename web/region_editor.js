@@ -192,12 +192,10 @@ function showBusy(text) {
   return () => el.remove();
 }
 
-async function ensureImageInfo(node) {
-  let info = findUpstreamImage(node);
-  if (info) return info;
-
-  // 没有直接可用的图：只执行本节点及上游，生成一次预览
-  console.log("[PreciseAlignRegion] no local image, queue partial execution for preview...");
+async function refreshPreview(node) {
+  // 清掉可能已失效的旧预览（ComfyUI 启动时会清理 temp），只执行本节点及上游
+  node._paImages = null;
+  console.log("[PreciseAlignRegion] refreshing preview via partial execution...");
   const busy = showBusy("正在生成预览…（只执行本节点及上游）");
   try {
     const wait = waitForPreview(node);
@@ -209,43 +207,33 @@ async function ensureImageInfo(node) {
   } finally {
     busy();
   }
-  return findUpstreamImage(node);
 }
 
-async function openEditor(node) {
-  injectStyle();
-  const widget = node.widgets?.find((w) => w.name === "shapes_json");
-  if (!widget) {
-    alert("Precise Align Region：找不到 shapes_json 控件。");
-    return;
-  }
-  let info = findUpstreamImage(node);
-  if (!info) {
-    info = await ensureImageInfo(node);
-  }
-  console.log("[PreciseAlignRegion] image info:", info, "paImages:", node._paImages);
-  if (!info) {
-    alert(
-      "自动生成预览失败。\n\n" +
-        "请确认：\n" +
-        "1) 本节点的 image 输入已经接上图像；\n" +
-        "2) 工作流可以正常执行（没有缺模型/报错）。\n\n" +
-        "也可以先点一次“运行”，再重新点“✏️ 画框 / 画圈”。"
-    );
-    return;
-  }
-
+function tryOpenEditor(node, widget, info, allowRefresh) {
   const candidates = [];
   for (const t of [info.type || "temp", "input", "temp"]) {
     if (!candidates.some((c) => c.type === t)) candidates.push({ ...info, type: t });
   }
   let idx = 0;
-  const tryNext = () => {
+  const tryNext = async () => {
     if (idx >= candidates.length) {
+      if (allowRefresh) {
+        await refreshPreview(node);
+        const fresh = findUpstreamImage(node);
+        console.log("[PreciseAlignRegion] refreshed image info:", fresh);
+        if (
+          fresh &&
+          (fresh.filename !== info.filename ||
+            (fresh.type || "temp") !== (info.type || "temp"))
+        ) {
+          tryOpenEditor(node, widget, fresh, false);
+          return;
+        }
+      }
       alert(
         "预览图加载失败：\n" +
           viewUrl(info) +
-          "\n\n请确认该图像仍然存在，或重新运行一次节点后再试。"
+          "\n\n已尝试重新生成预览但仍失败。请确认 image 输入已接图，且工作流没有报错。"
       );
       return;
     }
@@ -259,6 +247,32 @@ async function openEditor(node) {
     img.src = viewUrl(cand);
   };
   tryNext();
+}
+
+async function openEditor(node) {
+  injectStyle();
+  const widget = node.widgets?.find((w) => w.name === "shapes_json");
+  if (!widget) {
+    alert("Precise Align Region：找不到 shapes_json 控件。");
+    return;
+  }
+  let info = findUpstreamImage(node);
+  if (!info) {
+    await refreshPreview(node);
+    info = findUpstreamImage(node);
+  }
+  console.log("[PreciseAlignRegion] image info:", info, "paImages:", node._paImages);
+  if (!info) {
+    alert(
+      "自动生成预览失败。\n\n" +
+        "请确认：\n" +
+        "1) 本节点的 image 输入已经接上图像；\n" +
+        "2) 工作流可以正常执行（没有缺模型/报错）。\n\n" +
+        "也可以先点一次“运行”，再重新点“✏️ 画框 / 画圈”。"
+    );
+    return;
+  }
+  tryOpenEditor(node, widget, info, true);
 }
 
 function buildModal(node, widget, img) {
