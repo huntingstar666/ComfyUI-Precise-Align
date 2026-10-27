@@ -290,19 +290,6 @@ B 方案 `mask_snap=on, expand=12, feather=24, blend_pixels=32, curve=smoothstep
 
 ---
 
-## 与 BlueBox Cut 的区别
-
-| | 本包 A（Qwen 2.1 模式） | Cut |
-|---|---|---|
-| 网格对齐 | ✅ `R=0` 恒等 | ✅ 不动点恒等 |
-| 是否改原图内容 | ❌ 只补边/缩放（可选） | 可能裁/补/缩放 |
-| 工作分辨率 | 保持原生（token 多） | 可压到 1~2MP |
-| 局部编辑 | ✅ latent noise mask | ❌ 无 |
-
-本包还多了方案 B（裁切）和缩放，两者几何层面等价。
-
----
-
 ## 实测
 
 - 14 种尺寸 × 2 种 align 补边→裁回逐像素一致；
