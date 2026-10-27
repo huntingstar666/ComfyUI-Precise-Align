@@ -126,10 +126,10 @@
         }
       },
       "widgets_values": [
-        "## Precise Align · Qwen-Image 2.1 局部编辑模板\n\n1. 在 **Load Image** 里换成本地图片；\n2. 点 **Precise Align · Region** 的「✏️ 画框 / 画圈」画编辑区域；\n3. 在 **TextEncodeQwenImage21** 里写编辑指令；\n4. 运行，结果由 **SaveImageAdvanced** 保存。\n\n零偏移要点：Pad 输出 `resolution=0` 接编码器，采样尺寸 = 补边后画布；\n解码后必须经过 **Crop Back** 再进 **Composite**。"
+        "## Precise Align · Qwen-Image 2.1 局部编辑模板\n\n1. 在 **Load Image** 里换成本地图片；\n2. 点 **Precise Align · Region** 的「✏️ 画框 / 画圈」画编辑区域；\n3. 在 **TextEncodeQwenImage21** 里写编辑指令；\n4. 运行，结果由 **SaveImageAdvanced** 保存。\n\n零偏移要点：Pad 输出 `resolution=0` 接编码器，采样尺寸 = 补边后画布；\n解码后必须经过 **Crop Back** 再进 **Composite**。\n\n一致性：默认接 `qwen-image-2.1-consistency-2000`（强度 1.0）；没有就换自己的 consistency LoRA，否则人物/细节容易变。"
       ],
       "widgets_values_named": {
-        "text": "## Precise Align · Qwen-Image 2.1 局部编辑模板\n\n1. 在 **Load Image** 里换成本地图片；\n2. 点 **Precise Align · Region** 的「✏️ 画框 / 画圈」画编辑区域；\n3. 在 **TextEncodeQwenImage21** 里写编辑指令；\n4. 运行，结果由 **SaveImageAdvanced** 保存。\n\n零偏移要点：Pad 输出 `resolution=0` 接编码器，采样尺寸 = 补边后画布；\n解码后必须经过 **Crop Back** 再进 **Composite**。"
+        "text": "## Precise Align · Qwen-Image 2.1 局部编辑模板\n\n1. 在 **Load Image** 里换成本地图片；\n2. 点 **Precise Align · Region** 的「✏️ 画框 / 画圈」画编辑区域；\n3. 在 **TextEncodeQwenImage21** 里写编辑指令；\n4. 运行，结果由 **SaveImageAdvanced** 保存。\n\n零偏移要点：Pad 输出 `resolution=0` 接编码器，采样尺寸 = 补边后画布；\n解码后必须经过 **Crop Back** 再进 **Composite**。\n\n一致性：默认接 `qwen-image-2.1-consistency-2000`（强度 1.0）；没有就换自己的 consistency LoRA，否则人物/细节容易变。"
       },
       "color": "#222",
       "bgcolor": "#000"
@@ -2398,7 +2398,8 @@
       "widgets_values_named": {
         "lora_name": "Qwen-功能2.1\\qwen-image-2.1-consistency-2000.safetensors",
         "strength_model": 1
-      }
+      },
+      "title": "一致性 LoRA（建议保留）"
     },
     {
       "id": 502,
