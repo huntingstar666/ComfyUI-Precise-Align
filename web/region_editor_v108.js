@@ -2,6 +2,8 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const NODE_NAME = "PreciseAlignRegion";
+const PA_EDITOR_VERSION = "1.0.8";
+console.log(`[PreciseAlignRegion] editor build ${PA_EDITOR_VERSION}`);
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -233,7 +235,8 @@ function tryOpenEditor(node, widget, info, allowRefresh) {
       alert(
         "预览图加载失败：\n" +
           viewUrl(info) +
-          "\n\n已尝试重新生成预览但仍失败。请确认 image 输入已接图，且工作流没有报错。"
+          "\n\n已尝试重新生成预览但仍失败。请确认 image 输入已接图，且工作流没有报错。" +
+          `\n\n(预览器版本 ${PA_EDITOR_VERSION})`
       );
       return;
     }
@@ -268,7 +271,8 @@ async function openEditor(node) {
         "请确认：\n" +
         "1) 本节点的 image 输入已经接上图像；\n" +
         "2) 工作流可以正常执行（没有缺模型/报错）。\n\n" +
-        "也可以先点一次“运行”，再重新点“✏️ 画框 / 画圈”。"
+        "也可以先点一次“运行”，再重新点“✏️ 画框 / 画圈”。" +
+        `\n\n(预览器版本 ${PA_EDITOR_VERSION})`
     );
     return;
   }

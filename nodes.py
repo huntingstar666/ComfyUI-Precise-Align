@@ -16,6 +16,7 @@
 import json
 import math
 import os
+import time
 import uuid
 
 import torch
@@ -836,7 +837,11 @@ def _rasterize_shapes(shapes_json, width, height):
 
 
 def _save_preview_ui(image):
-    """把首帧存到 ComfyUI temp，供前端编辑器显示（失败则返回空 ui）。"""
+    """把首帧存到 output/precise_align_preview，供前端编辑器显示。
+
+    不再用 temp：ComfyUI 每次启动都会清空 temp，重启后旧预览 URL 会 404。
+    （失败则返回空 ui，不影响节点执行。）
+    """
     try:
         import folder_paths
         import numpy as np
@@ -846,10 +851,30 @@ def _save_preview_ui(image):
         if arr.ndim == 2:
             arr = np.stack([arr] * 3, axis=-1)
         arr = (arr[..., :3] * 255.0).round().astype("uint8")
+
+        subfolder = "precise_align_preview"
+        base = os.path.join(folder_paths.get_output_directory(), subfolder)
+        os.makedirs(base, exist_ok=True)
         name = f"precise_region_{uuid.uuid4().hex[:12]}.png"
-        path = os.path.join(folder_paths.get_temp_directory(), name)
+        path = os.path.join(base, name)
         Image.fromarray(arr).save(path, compress_level=1)
-        return {"images": [{"filename": name, "subfolder": "", "type": "temp"}]}
+
+        # 简单清理：只保留最近 80 张，并删除 7 天前的
+        try:
+            files = [f for f in os.listdir(base)
+                     if f.startswith("precise_region_") and f.endswith(".png")]
+            files.sort(key=lambda f: os.path.getmtime(os.path.join(base, f)))
+            for f in files[:-80]:
+                os.remove(os.path.join(base, f))
+            now = time.time()
+            for f in files[-80:]:
+                p = os.path.join(base, f)
+                if now - os.path.getmtime(p) > 7 * 86400:
+                    os.remove(p)
+        except Exception:
+            pass
+
+        return {"images": [{"filename": name, "subfolder": subfolder, "type": "output"}]}
     except Exception as exc:
         print(f"[PreciseAlignRegion] 预览图生成失败：{exc}")
         return {}
