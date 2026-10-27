@@ -151,12 +151,16 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 遮罩坐标按原图记录，节点内部会随缩放/补边自动映射。
 
 > 编辑器预览图保存在 `output/precise_align_preview/`：**每个 Region 节点只保留 1 张**（按节点 id 覆盖），整个目录最多 8 张、超过 1 天自动删除，不会堆积。若仍遇到旧预览失效，点按钮会自动**只执行本节点及上游**重新生成。
-**每个版本更新后必须做这两步：**
-> 1. **完全关闭 ComfyUI 进程再启动**（不是刷新页面）；服务端日志应出现 `[PreciseAlign] build 1.0.10 loaded`；
-> 2. 浏览器 F12 → Network 勾选 **Disable cache**，再 Ctrl+F5；Console 应出现
->    `[PreciseAlignRegion] editor build 1.0.10` 和 `[PreciseAlignRegion] server build 1.0.10 ok`。
+**更新后至少要做这一步（否则会继续运行旧前端）：**
+> 浏览器 F12 → Network 勾选 **Disable cache** → **Ctrl+F5**（或 Ctrl+Shift+R）；
+> Console 应出现 `[PreciseAlignRegion] editor build 1.0.11`。
 >
-> 如果页面顶部出现红色提示条，说明前端/服务端版本不一致：服务端没重启或浏览器用了旧缓存。
+> 建议同时**完全重启 ComfyUI 进程**（服务端 Python 也有更新，重启后预览会持久化到 output）；
+> 服务端日志会出现 `[PreciseAlign] build 1.0.11 loaded`，Console 会出现
+> `[PreciseAlignRegion] server build 1.0.11 ok`。
+> 若暂时不重启：新前端在点按钮时会自动只执行本节点及上游来生成预览，编辑器仍可用。
+>
+> 如果页面顶部出现红色提示条，说明前端/服务端版本不一致：浏览器缓存没清或服务端没重启。
 
 
 ---

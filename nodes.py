@@ -915,7 +915,7 @@ class PreciseAlignRegion:
     OUTPUT_NODE = True
     CATEGORY = CATEGORY
     DESCRIPTION = ("在图像上画矩形/椭圆，输出遮罩与包围盒；遮罩可接 Precise Align Pad / Crop Edit 的 mask 输入。"
-                   " (build 1.0.10)")
+                   " (build 1.0.11)")
 
     def run(self, image, shapes_json, unique_id=None):
         h, w = int(image.shape[1]), int(image.shape[2])

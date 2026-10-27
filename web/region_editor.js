@@ -2,7 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const NODE_NAME = "PreciseAlignRegion";
-const PA_EDITOR_VERSION = "1.0.10";
+const PA_EDITOR_VERSION = "1.0.11";
 console.log(`[PreciseAlignRegion] editor build ${PA_EDITOR_VERSION}`);
 
 // ---------------------------------------------------------------------------
@@ -529,11 +529,8 @@ async function checkServerBuild() {
       console.log(`[PreciseAlignRegion] server build ${d.version} ok`);
     }
   } catch (e) {
-    console.warn("[PreciseAlignRegion] server version check failed:", e);
-    showStaleBanner(
-      "Precise Align 服务端仍是旧版本（没有版本接口）。\n" +
-        "请完全重启 ComfyUI 进程（不是刷新页面），再 Ctrl+F5。"
-    );
+    // 旧版服务端没有版本接口，但配合“自动重新生成预览”仍可正常打开编辑器
+    console.warn("[PreciseAlignRegion] server version check unavailable (old server?):", e);
   }
 }
 
