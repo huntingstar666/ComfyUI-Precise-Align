@@ -165,6 +165,13 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 
 ---
 
+## 示例 / 模板工作流
+
+- `example_workflows/precise_align_qwen21_local_edit.json`：方案 A（全画布局部编辑）Qwen-Image 2.1 模板，包含 Pad / Region / Crop Back / Composite 的完整连线与 Set Latent Noise Mask。
+- 使用前把 **Load Image** 换成自己的图；三个模型 Loader 选择本机 Qwen-Image 2.1 模型；Region 节点里已预置一个居中示例框，可重新画。
+- 原始工作流里的提示词、图片文件名、本地路径已全部替换为通用占位；`example.png` 是 ComfyUI 自带示例图。
+- 提示词增强分支（TextGenerateLTX2Prompt / CLIPLoader 等）是绕过状态，不需要可直接删除。
+
 ## 标准连线
 
 ### 方案 A：全画布局部编辑
