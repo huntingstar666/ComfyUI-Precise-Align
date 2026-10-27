@@ -1,0 +1,384 @@
+{
+  "PreciseAlignPad": {
+    "display_name": "精确对齐 · 补边（方案A）",
+    "description": "通用补边对齐：缩放/补边到指定步长（默认 32），可框选生成噪声遮罩；Qwen 2.1 搭配 resolution=0 实现零偏移，其他模型忽略 resolution 输出。",
+    "inputs": {
+      "image": {
+        "name": "图像",
+        "tooltip": "原始图像（支持 batch，同批必须同尺寸）"
+      },
+      "pad_mode": {
+        "name": "补边方式",
+        "tooltip": "补边方式：边缘复制最安全，镜像次之，纯色请配合填充灰度",
+        "options": {
+          "edge": "边缘复制（推荐）",
+          "reflect": "镜像",
+          "gray": "灰色",
+          "black": "黑色",
+          "white": "白色"
+        }
+      },
+      "align": {
+        "name": "补边方向",
+        "tooltip": "居中补边更符合模型习惯；左上补边会让内容坐标完全不动",
+        "options": {
+          "center": "居中（推荐）",
+          "top_left": "左上"
+        }
+      },
+      "pad_value": {
+        "name": "填充灰度",
+        "tooltip": "补边方式选“灰色”时的填充值（0=黑，1=白）"
+      },
+      "multiple": {
+        "name": "对齐步长",
+        "tooltip": "对齐步长：Qwen 2.1 用 32；SD/SDXL 可用 8；Flux/SD3 可用 16"
+      },
+      "mask": {
+        "name": "遮罩",
+        "tooltip": "可选：原图尺寸的遮罩（框选/涂抹区域），优先于下方框选坐标"
+      },
+      "box_x": {
+        "name": "框选 X",
+        "tooltip": "框选区域左上角 X（原图坐标，像素）"
+      },
+      "box_y": {
+        "name": "框选 Y",
+        "tooltip": "框选区域左上角 Y（原图坐标，像素）"
+      },
+      "box_w": {
+        "name": "框选宽度",
+        "tooltip": "框选宽度；与框选高度一起大于 0 时生效"
+      },
+      "box_h": {
+        "name": "框选高度",
+        "tooltip": "框选高度；与框选宽度一起大于 0 时生效"
+      },
+      "mask_expand": {
+        "name": "遮罩外扩",
+        "tooltip": "遮罩向外扩张的像素，覆盖边界、避免接缝，建议 8~16"
+      },
+      "mask_feather": {
+        "name": "遮罩羽化",
+        "tooltip": "高斯羽化半径（像素），建议 24~48"
+      },
+      "mask_snap": {
+        "name": "框选对齐 32",
+        "tooltip": "把框选矩形向外对齐到 32 网格，避免 latent 半格硬边"
+      },
+      "scale_by": {
+        "name": "缩放倍数",
+        "tooltip": "缩放倍数；1.0 = 跳过缩放（不重采样）"
+      },
+      "scale_method": {
+        "name": "缩放算法",
+        "tooltip": "缩放算法：Lanczos 最锐，区域适合缩小",
+        "options": {
+          "lanczos": "Lanczos（锐）",
+          "bicubic": "双三次",
+          "bilinear": "双线性",
+          "area": "区域（缩小优选）",
+          "nearest-exact": "邻近精确"
+        }
+      },
+      "scale_step": {
+        "name": "缩放对齐步长",
+        "tooltip": "缩放后宽高对齐到该步长（默认 32）"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "图像",
+        "tooltip": "缩放+补边后的图像（同时喂给文本编码器和 VAEEncode）"
+      },
+      "1": {
+        "name": "高度",
+        "tooltip": "补边后高度"
+      },
+      "2": {
+        "name": "宽度",
+        "tooltip": "补边后宽度"
+      },
+      "3": {
+        "name": "resolution",
+        "tooltip": "恒为 0（Qwen 2.1 专用：接 TextEncodeQwenImage21.resolution；其他模型忽略）"
+      },
+      "4": {
+        "name": "补边信息",
+        "tooltip": "处理信息，接“裁回原尺寸”节点"
+      },
+      "5": {
+        "name": "遮罩",
+        "tooltip": "画布对齐的遮罩：框内=1、框外=0；未选区域时全 1"
+      }
+    }
+  },
+  "PreciseAlignCropBack": {
+    "display_name": "精确对齐 · 裁回（方案A）",
+    "description": "把解码后的图像按补边信息精确裁回原尺寸（含缩放逆变换），并输出裁回后的遮罩。",
+    "inputs": {
+      "image": {
+        "name": "图像",
+        "tooltip": "VAE Decode 之后的图像（画布尺寸）"
+      },
+      "pad_info": {
+        "name": "补边信息",
+        "tooltip": "“全画布补边”节点输出的处理信息"
+      },
+      "mask": {
+        "name": "遮罩",
+        "tooltip": "“全画布补边”节点输出的遮罩（可选）；接了才会输出裁回后的遮罩"
+      },
+      "downscale_method": {
+        "name": "缩回算法",
+        "tooltip": "缩放逆变换使用的算法（缩放倍数≠1 时生效）",
+        "options": {
+          "lanczos": "Lanczos（锐）",
+          "bicubic": "双三次",
+          "bilinear": "双线性",
+          "area": "区域（缩小优选）",
+          "nearest-exact": "邻近精确"
+        }
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "图像",
+        "tooltip": "裁回原始尺寸的图像"
+      },
+      "1": {
+        "name": "遮罩",
+        "tooltip": "裁回原始尺寸的遮罩（未接遮罩时全 0）"
+      }
+    }
+  },
+  "PreciseAlignCropEdit": {
+    "display_name": "精确对齐 · 裁切（方案B）",
+    "description": "通用裁切局部：按框/遮罩裁出编辑区并保留上下文，补边到指定步长（默认 32）；适合移除物体、大图局部修改。",
+    "inputs": {
+      "image": {
+        "name": "图像",
+        "tooltip": "原始图像（支持 batch，同批必须同尺寸）"
+      },
+      "context_factor": {
+        "name": "上下文倍数",
+        "tooltip": "编辑区外扩倍数（上下文），建议 1.3~1.6"
+      },
+      "context_pixels": {
+        "name": "上下文像素",
+        "tooltip": "额外外扩像素（叠加在倍数之后），建议 64~128"
+      },
+      "pad_mode": {
+        "name": "补边方式",
+        "tooltip": "裁切块补到 32 倍数时的填充方式",
+        "options": {
+          "edge": "边缘复制（推荐）",
+          "reflect": "镜像",
+          "gray": "灰色",
+          "black": "黑色",
+          "white": "白色"
+        }
+      },
+      "align": {
+        "name": "补边方向",
+        "tooltip": "居中补边更符合模型习惯",
+        "options": {
+          "center": "居中（推荐）",
+          "top_left": "左上"
+        }
+      },
+      "pad_value": {
+        "name": "填充灰度",
+        "tooltip": "补边方式选“灰色”时的填充值（0=黑，1=白）"
+      },
+      "multiple": {
+        "name": "对齐步长",
+        "tooltip": "对齐步长：Qwen 2.1 用 32；SD/SDXL 可用 8；Flux/SD3 可用 16"
+      },
+      "mask": {
+        "name": "遮罩",
+        "tooltip": "编辑区域遮罩（原图尺寸）；全黑会报错，优先于下方框选坐标"
+      },
+      "box_x": {
+        "name": "框选 X",
+        "tooltip": "框选区域左上角 X（原图坐标，像素）"
+      },
+      "box_y": {
+        "name": "框选 Y",
+        "tooltip": "框选区域左上角 Y（原图坐标，像素）"
+      },
+      "box_w": {
+        "name": "框选宽度",
+        "tooltip": "框选宽度；与框选高度一起大于 0 时生效"
+      },
+      "box_h": {
+        "name": "框选高度",
+        "tooltip": "框选高度；与框选宽度一起大于 0 时生效"
+      },
+      "mask_expand": {
+        "name": "遮罩外扩",
+        "tooltip": "遮罩向外扩张的像素，覆盖边界、避免接缝"
+      },
+      "mask_feather": {
+        "name": "遮罩羽化",
+        "tooltip": "高斯羽化半径（像素），建议 24~48"
+      },
+      "mask_snap": {
+        "name": "框选对齐 32",
+        "tooltip": "把框选矩形向外对齐到 32 网格"
+      },
+      "scale_by": {
+        "name": "缩放倍数",
+        "tooltip": "裁切块缩放倍数；1.0=不缩放；小图可放大到 1024 左右再编辑"
+      },
+      "scale_method": {
+        "name": "缩放算法",
+        "tooltip": "裁切块缩放算法",
+        "options": {
+          "lanczos": "Lanczos（锐）",
+          "bicubic": "双三次",
+          "bilinear": "双线性",
+          "area": "区域（缩小优选）",
+          "nearest-exact": "邻近精确"
+        }
+      },
+      "scale_step": {
+        "name": "缩放对齐步长",
+        "tooltip": "缩放后宽高对齐到该步长（默认 32）"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "裁切图",
+        "tooltip": "裁切+补边后的编辑区（同时喂给文本编码器和 VAEEncode）"
+      },
+      "1": {
+        "name": "高度",
+        "tooltip": "画布高度"
+      },
+      "2": {
+        "name": "宽度",
+        "tooltip": "画布宽度"
+      },
+      "3": {
+        "name": "resolution",
+        "tooltip": "恒为 0（Qwen 2.1 专用：接 TextEncodeQwenImage21.resolution；其他模型忽略）"
+      },
+      "4": {
+        "name": "裁切信息",
+        "tooltip": "裁切信息，接“贴回原图”节点"
+      },
+      "5": {
+        "name": "遮罩",
+        "tooltip": "画布对齐的遮罩（可接 Set Latent Noise Mask，只改物体不重绘上下文）"
+      }
+    }
+  },
+  "PreciseAlignStitch": {
+    "display_name": "精确对齐 · 贴回（方案B）",
+    "description": "方案B：把解码后的裁切块按裁切信息贴回原图，支持平滑过渡、边缘羽化与颜色匹配。",
+    "inputs": {
+      "original_image": {
+        "name": "原图",
+        "tooltip": "原始整图（贴回目标，尺寸必须与裁切信息一致）"
+      },
+      "edited_image": {
+        "name": "编辑结果",
+        "tooltip": "裁切块的解码结果（画布尺寸）"
+      },
+      "crop_info": {
+        "name": "裁切信息",
+        "tooltip": "“裁切局部”节点输出的裁切信息"
+      },
+      "mask": {
+        "name": "遮罩",
+        "tooltip": "“裁切局部”节点输出的遮罩（可选）；用于混合与颜色匹配"
+      },
+      "blend_pixels": {
+        "name": "边缘羽化",
+        "tooltip": "贴回边缘的羽化像素，建议 24~48"
+      },
+      "upscale_method": {
+        "name": "放大算法",
+        "tooltip": "裁切块缩回原尺寸时使用的算法",
+        "options": {
+          "lanczos": "Lanczos（锐）",
+          "bicubic": "双三次",
+          "bilinear": "双线性",
+          "area": "区域",
+          "nearest-exact": "邻近精确"
+        }
+      },
+      "curve": {
+        "name": "过渡曲线",
+        "tooltip": "过渡曲线：平滑过渡接缝更自然，线性更直接",
+        "options": {
+          "smoothstep": "平滑过渡",
+          "linear": "线性"
+        }
+      },
+      "color_match": {
+        "name": "颜色匹配",
+        "tooltip": "贴回前用边缘过渡带把裁切块颜色拉回原图"
+      },
+      "color_strength": {
+        "name": "颜色匹配强度",
+        "tooltip": "颜色匹配强度（0=关闭，1=完全匹配）"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "图像",
+        "tooltip": "贴回后的整图（原尺寸）"
+      }
+    }
+  },
+  "PreciseAlignComposite": {
+    "display_name": "精确对齐 · 合成（方案A）",
+    "description": "方案A 收尾：用遮罩把编辑结果合成到原图上（高斯羽化 + 可选颜色匹配），遮罩外保持原图像素。",
+    "inputs": {
+      "original_image": {
+        "name": "原图",
+        "tooltip": "原始图像（用于保留遮罩外的像素）"
+      },
+      "edited_image": {
+        "name": "编辑结果",
+        "tooltip": "裁回后的编辑结果（尺寸必须与原图一致）"
+      },
+      "mask": {
+        "name": "遮罩",
+        "tooltip": "画布遮罩：白色=使用编辑结果，黑色=保留原图"
+      },
+      "invert_mask": {
+        "name": "反转遮罩",
+        "tooltip": "反转遮罩（白黑互换）"
+      },
+      "feather": {
+        "name": "羽化",
+        "tooltip": "高斯羽化半径（像素），用于消除接缝，建议 24~48"
+      },
+      "curve": {
+        "name": "过渡曲线",
+        "tooltip": "过渡曲线：平滑过渡接缝更自然，线性更直接",
+        "options": {
+          "smoothstep": "平滑过渡",
+          "linear": "线性"
+        }
+      },
+      "color_match": {
+        "name": "颜色匹配",
+        "tooltip": "用过渡带的均值/标准差把编辑结果的颜色拉回原图"
+      },
+      "color_strength": {
+        "name": "颜色匹配强度",
+        "tooltip": "颜色匹配强度（0=关闭，1=完全匹配）"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "图像",
+        "tooltip": "合成后的图像：遮罩内来自编辑结果，遮罩外保持原图"
+      }
+    }
+  }
+}
