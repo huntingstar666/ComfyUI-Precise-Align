@@ -174,6 +174,7 @@ KSampler → VAE Decode → B-2 Stitch Back（+ 原图）
 
 ## 缩放说明
 
+- 三个缩放参数（`scale_by` / `scale_method` / `scale_step`）默认显示在节点上；`scale_by=1.0` 即关闭缩放。
 - `scale_by=1.0`（默认）**完全跳过缩放**，不产生任何重采样；
 - 缩放后按 `scale_step` 对齐宽高（默认 32），再补边兜底；
 - A-2 会自动做缩放逆变换（裁回后缩回原尺寸）；
