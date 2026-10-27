@@ -2,7 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const NODE_NAME = "PreciseAlignRegion";
-const PA_EDITOR_VERSION = "1.0.8";
+const PA_EDITOR_VERSION = "1.0.10";
 console.log(`[PreciseAlignRegion] editor build ${PA_EDITOR_VERSION}`);
 
 // ---------------------------------------------------------------------------
@@ -496,6 +496,48 @@ function buildModal(node, widget, img) {
 // ---------------------------------------------------------------------------
 // extension
 // ---------------------------------------------------------------------------
+
+function showStaleBanner(message) {
+  if (document.getElementById("pa-stale-banner")) return;
+  const el = document.createElement("div");
+  el.id = "pa-stale-banner";
+  el.style.cssText =
+    "position:fixed;top:0;left:0;right:0;z-index:100001;background:#b91c1c;color:#fff;" +
+    "font:13px/1.6 system-ui,sans-serif;padding:10px 16px;" +
+    "box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:pre-wrap;";
+  el.textContent = message;
+  document.body.appendChild(el);
+}
+
+async function checkServerBuild() {
+  let url = "/api/precise_align/version";
+  try {
+    url = api.apiURL("/precise_align/version");
+  } catch (e) {
+    /* ignore */
+  }
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    if (String(d.version) !== PA_EDITOR_VERSION) {
+      showStaleBanner(
+        `Precise Align 版本不一致：前端 v${PA_EDITOR_VERSION} / 服务端 v${d.version}。\n` +
+          "请完全重启 ComfyUI 进程（关闭后重新启动），然后 Ctrl+F5。"
+      );
+    } else {
+      console.log(`[PreciseAlignRegion] server build ${d.version} ok`);
+    }
+  } catch (e) {
+    console.warn("[PreciseAlignRegion] server version check failed:", e);
+    showStaleBanner(
+      "Precise Align 服务端仍是旧版本（没有版本接口）。\n" +
+        "请完全重启 ComfyUI 进程（不是刷新页面），再 Ctrl+F5。"
+    );
+  }
+}
+
+setTimeout(checkServerBuild, 1200);
 
 app.registerExtension({
   name: "Comfy.PreciseAlign.RegionEditor",

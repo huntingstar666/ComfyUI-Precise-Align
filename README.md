@@ -151,7 +151,12 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 遮罩坐标按原图记录，节点内部会随缩放/补边自动映射。
 
 > 编辑器预览图保存在 `output/precise_align_preview/`：**每个 Region 节点只保留 1 张**（按节点 id 覆盖），整个目录最多 8 张、超过 1 天自动删除，不会堆积。若仍遇到旧预览失效，点按钮会自动**只执行本节点及上游**重新生成。
-> 更新插件后请**重启 ComfyUI 并 Ctrl+F5 强刷**页面（前端 JS 已改名，控制台会打印 `[PreciseAlignRegion] editor build 1.0.8` 便于确认版本）。
+**每个版本更新后必须做这两步：**
+> 1. **完全关闭 ComfyUI 进程再启动**（不是刷新页面）；服务端日志应出现 `[PreciseAlign] build 1.0.10 loaded`；
+> 2. 浏览器 F12 → Network 勾选 **Disable cache**，再 Ctrl+F5；Console 应出现
+>    `[PreciseAlignRegion] editor build 1.0.10` 和 `[PreciseAlignRegion] server build 1.0.10 ok`。
+>
+> 如果页面顶部出现红色提示条，说明前端/服务端版本不一致：服务端没重启或浏览器用了旧缓存。
 
 
 ---

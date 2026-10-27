@@ -16,5 +16,28 @@ F. PreciseAlignRegion     —— 画框/画圈生成遮罩与包围盒
 from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
 WEB_DIRECTORY = "./web"
+__version__ = "1.0.10"
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY", "__version__"]
+
+
+def _register_version_route():
+    """给前端一个版本探测接口：前端发现服务端版本过旧时会提示重启。"""
+    try:
+        from aiohttp import web
+        from server import PromptServer
+
+        async def _version(request):
+            return web.json_response({"version": __version__})
+
+        for path in ("/precise_align/version", "/api/precise_align/version"):
+            try:
+                PromptServer.instance.routes.get(path)(_version)
+            except Exception:
+                pass
+    except Exception as exc:
+        print(f"[PreciseAlign] version route skipped: {exc}")
+
+
+_register_version_route()
+print(f"[PreciseAlign] build {__version__} loaded")
