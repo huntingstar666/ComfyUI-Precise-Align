@@ -143,7 +143,11 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 2. 直接点节点上的 **✏️ 画框 / 画圈** 按钮（或右键菜单）——**不需要提前运行**：
    - 上游是 `Load Image` 时直接读取原图；
    - 上游是中间链路时，自动**只执行本节点及上游**生成预览，不会跑下游采样；
-3. 在弹窗里用「矩形 / 圆形」拖动绘制，可多个形状，支持撤销/清空/Ctrl+Z；
+3. 在弹窗里用「矩形 / 圆形」拖动绘制；画好后可继续调整：
+   - 点中形状 → **拖动移动**；
+   - 拖形状周围的 8 个白点 → **缩放**；
+   - `Delete` 或「🗑 删除选中」→ 删除；
+   - 按住 `Alt` 拖 → 强制新建；支持撤销/清空/Ctrl+Z；
 4. 点「应用」写回形状，再运行工作流，输出 `mask` 与包围盒 `box_x/y/w/h`。
 
 输出 `mask` 直接接 **Pad / Crop Edit 的 `mask` 输入**即可；`image` 是透传，方便串在链路里。
@@ -153,7 +157,7 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 > 编辑器预览图保存在 `output/precise_align_preview/`：**每个 Region 节点只保留 1 张**（按节点 id 覆盖），整个目录最多 8 张、超过 1 天自动删除，不会堆积。若仍遇到旧预览失效，点按钮会自动**只执行本节点及上游**重新生成。
 **更新后至少要做这一步（否则会继续运行旧前端）：**
 > 浏览器 F12 → Network 勾选 **Disable cache** → **Ctrl+F5**（或 Ctrl+Shift+R）；
-> Console 应出现 `[PreciseAlignRegion] editor build 1.0.11`。
+> Console 应出现 `[PreciseAlignRegion] editor build 1.0.13`。
 >
 > 建议同时**完全重启 ComfyUI 进程**（服务端 Python 也有更新，重启后预览会持久化到 output）；
 > 服务端日志会出现 `[PreciseAlign] build 1.0.11 loaded`，Console 会出现

@@ -2,7 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const NODE_NAME = "PreciseAlignRegion";
-const PA_EDITOR_VERSION = "1.0.11";
+const PA_EDITOR_VERSION = "1.0.13";
 console.log(`[PreciseAlignRegion] editor build ${PA_EDITOR_VERSION}`);
 
 // ---------------------------------------------------------------------------
@@ -294,6 +294,8 @@ function buildModal(node, widget, img) {
   let tool = "rect";
   let drawing = null;
   let start = null;
+  let selected = -1;
+  let drag = null;
 
   const overlay = document.createElement("div");
   overlay.className = "pa-overlay";
@@ -319,7 +321,10 @@ function buildModal(node, widget, img) {
   const btnClear = document.createElement("button");
   btnClear.className = "pa-btn danger";
   btnClear.textContent = "清空";
-  tools.append(btnRect, btnEllipse, btnUndo, btnClear);
+  const btnDelete = document.createElement("button");
+  btnDelete.className = "pa-btn danger";
+  btnDelete.textContent = "🗑 删除选中";
+  tools.append(btnRect, btnEllipse, btnUndo, btnClear, btnDelete);
 
   const wrap = document.createElement("div");
   wrap.className = "pa-canvas-wrap";
@@ -333,7 +338,8 @@ function buildModal(node, widget, img) {
 
   const hint = document.createElement("div");
   hint.className = "pa-hint";
-  hint.textContent = "拖动鼠标画形状；可画多个。应用后由节点生成遮罩。";
+  hint.textContent =
+    "拖动空白处画新形状；点中形状可拖动移动；拖 8 个白点可缩放；Delete 删除选中。";
 
   const foot = document.createElement("div");
   foot.className = "pa-foot";
@@ -359,7 +365,8 @@ function buildModal(node, widget, img) {
   const ctx = canvas.getContext("2d");
 
   function updateCount() {
-    count.textContent = `形状：${shapes.length} 个`;
+    const sel = selected >= 0 ? `（选中第 ${selected + 1} 个，Delete 删除）` : "";
+    count.textContent = `形状：${shapes.length} 个${sel}`;
   }
 
   function drawShape(s, dashed) {
@@ -391,6 +398,7 @@ function buildModal(node, widget, img) {
     ctx.clearRect(0, 0, nw, nh);
     ctx.drawImage(img, 0, 0, nw, nh);
     for (const s of shapes) drawShape(s, false);
+    if (selected >= 0 && shapes[selected]) drawSelection(shapes[selected]);
     if (drawing) drawShape(drawing, true);
     updateCount();
   }
@@ -403,6 +411,102 @@ function buildModal(node, widget, img) {
       x: Math.max(0, Math.min(nw, x)),
       y: Math.max(0, Math.min(nh, y)),
     };
+  }
+
+  // ---- selection / move / resize -----------------------------------------
+
+  const HANDLE_CURSORS = {
+    nw: "nwse-resize", se: "nwse-resize",
+    ne: "nesw-resize", sw: "nesw-resize",
+    n: "ns-resize", s: "ns-resize",
+    e: "ew-resize", w: "ew-resize",
+  };
+
+  function handleTol() {
+    return Math.max(8, Math.round(Math.min(nw, nh) / 110));
+  }
+
+  function handlesOf(s) {
+    const { x, y, w, h } = s;
+    return [
+      { name: "nw", x, y },
+      { name: "n", x: x + w / 2, y },
+      { name: "ne", x: x + w, y },
+      { name: "e", x: x + w, y: y + h / 2 },
+      { name: "se", x: x + w, y: y + h },
+      { name: "s", x: x + w / 2, y: y + h },
+      { name: "sw", x, y: y + h },
+      { name: "w", x, y: y + h / 2 },
+    ];
+  }
+
+  function hitHandle(s, px, py) {
+    const tol = handleTol();
+    for (const h of handlesOf(s)) {
+      if (Math.abs(px - h.x) <= tol && Math.abs(py - h.y) <= tol) return h.name;
+    }
+    return null;
+  }
+
+  function pointInShape(s, px, py) {
+    if (s.type === "ellipse" || s.type === "circle") {
+      const cx = s.x + s.w / 2;
+      const cy = s.y + s.h / 2;
+      const rx = Math.max(s.w / 2, 0.5);
+      const ry = Math.max(s.h / 2, 0.5);
+      return ((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2 <= 1;
+    }
+    return px >= s.x && px <= s.x + s.w && py >= s.y && py <= s.y + s.h;
+  }
+
+  function clampShape(s) {
+    s.w = Math.max(3, Math.min(nw, s.w));
+    s.h = Math.max(3, Math.min(nh, s.h));
+    s.x = Math.max(0, Math.min(nw - s.w, s.x));
+    s.y = Math.max(0, Math.min(nh - s.h, s.y));
+  }
+
+  function resizeFromHandle(orig, handle, p) {
+    let x1 = orig.x;
+    let y1 = orig.y;
+    let x2 = orig.x + orig.w;
+    let y2 = orig.y + orig.h;
+    const min = Math.max(3, Math.round(Math.min(nw, nh) / 400));
+    if (handle.includes("w")) x1 = Math.min(Math.max(0, p.x), x2 - min);
+    if (handle.includes("e")) x2 = Math.max(Math.min(nw, p.x), x1 + min);
+    if (handle.includes("n")) y1 = Math.min(Math.max(0, p.y), y2 - min);
+    if (handle.includes("s")) y2 = Math.max(Math.min(nh, p.y), y1 + min);
+    return { type: orig.type, x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  }
+
+  function drawSelection(s) {
+    const lw = Math.max(2, Math.round(nw / 480));
+    ctx.save();
+    ctx.setLineDash([Math.max(6, nw / 180), Math.max(4, nw / 300)]);
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeRect(s.x, s.y, s.w, s.h);
+    ctx.setLineDash([]);
+    const hs = Math.max(8, Math.round(Math.min(nw, nh) / 90));
+    for (const h of handlesOf(s)) {
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#ff2d2d";
+      ctx.lineWidth = Math.max(1, lw / 2);
+      ctx.fillRect(h.x - hs / 2, h.y - hs / 2, hs, hs);
+      ctx.strokeRect(h.x - hs / 2, h.y - hs / 2, hs, hs);
+    }
+    ctx.restore();
+  }
+
+  function cursorAt(p) {
+    if (selected >= 0 && shapes[selected]) {
+      const h = hitHandle(shapes[selected], p.x, p.y);
+      if (h) return HANDLE_CURSORS[h] || "crosshair";
+    }
+    for (let i = shapes.length - 1; i >= 0; i--) {
+      if (pointInShape(shapes[i], p.x, p.y)) return "move";
+    }
+    return "crosshair";
   }
 
   function setTool(t) {
@@ -419,32 +523,112 @@ function buildModal(node, widget, img) {
   }
 
   function onKey(e) {
-    if (e.key === "Escape") close();
+    if (e.key === "Escape") {
+      if (selected >= 0) {
+        selected = -1;
+        render();
+      } else {
+        close();
+      }
+      return;
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && selected >= 0) {
+      e.preventDefault();
+      shapes.splice(selected, 1);
+      selected = -1;
+      render();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
       shapes.pop();
+      if (selected >= shapes.length) selected = shapes.length - 1;
       render();
     }
   }
 
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
-    start = toImage(e);
-    drawing = { type: tool, x: start.x, y: start.y, w: 0, h: 0 };
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    if (!drawing || !start) return;
     const p = toImage(e);
-    drawing.x = Math.min(start.x, p.x);
-    drawing.y = Math.min(start.y, p.y);
-    drawing.w = Math.abs(p.x - start.x);
-    drawing.h = Math.abs(p.y - start.y);
+
+    // 1) 拖选中形状的 8 个手柄 -> 缩放
+    if (selected >= 0 && shapes[selected]) {
+      const h = hitHandle(shapes[selected], p.x, p.y);
+      if (h) {
+        drag = {
+          mode: "resize",
+          handle: h,
+          start: p,
+          orig: { ...shapes[selected] },
+          index: selected,
+        };
+        canvas.setPointerCapture(e.pointerId);
+        render();
+        return;
+      }
+    }
+
+    // 2) 点中已有形状（按住 Alt 可强制画新形状）-> 选中并拖动
+    if (!e.altKey) {
+      for (let i = shapes.length - 1; i >= 0; i--) {
+        if (pointInShape(shapes[i], p.x, p.y)) {
+          selected = i;
+          drag = { mode: "move", start: p, orig: { ...shapes[i] }, index: i };
+          canvas.setPointerCapture(e.pointerId);
+          canvas.style.cursor = "move";
+          render();
+          return;
+        }
+      }
+    }
+
+    // 3) 空白处拖 -> 画新形状
+    selected = -1;
+    start = p;
+    drawing = { type: tool, x: p.x, y: p.y, w: 0, h: 0 };
+    canvas.setPointerCapture(e.pointerId);
     render();
   });
+
+  canvas.addEventListener("pointermove", (e) => {
+    const p = toImage(e);
+
+    if (drag) {
+      if (drag.mode === "move") {
+        const s = shapes[drag.index];
+        if (s) {
+          s.x = drag.orig.x + (p.x - drag.start.x);
+          s.y = drag.orig.y + (p.y - drag.start.y);
+          clampShape(s);
+        }
+      } else if (drag.mode === "resize") {
+        shapes[drag.index] = resizeFromHandle(drag.orig, drag.handle, p);
+      }
+      render();
+      return;
+    }
+
+    if (drawing && start) {
+      drawing.x = Math.min(start.x, p.x);
+      drawing.y = Math.min(start.y, p.y);
+      drawing.w = Math.abs(p.x - start.x);
+      drawing.h = Math.abs(p.y - start.y);
+      render();
+      return;
+    }
+
+    canvas.style.cursor = cursorAt(p);
+  });
+
   canvas.addEventListener("pointerup", (e) => {
-    if (!drawing) return;
     canvas.releasePointerCapture?.(e.pointerId);
+    if (drag) {
+      drag = null;
+      canvas.style.cursor = cursorAt(toImage(e));
+      render();
+      return;
+    }
+    if (!drawing) return;
     if (drawing.w >= 3 && drawing.h >= 3) {
       shapes.push({
         type: drawing.type,
@@ -453,12 +637,15 @@ function buildModal(node, widget, img) {
         w: drawing.w,
         h: drawing.h,
       });
+      selected = shapes.length - 1;
     }
     drawing = null;
     start = null;
     render();
   });
+
   canvas.addEventListener("pointercancel", () => {
+    drag = null;
     drawing = null;
     start = null;
     render();
@@ -468,11 +655,20 @@ function buildModal(node, widget, img) {
   btnEllipse.onclick = () => setTool("ellipse");
   btnUndo.onclick = () => {
     shapes.pop();
+    if (selected >= shapes.length) selected = shapes.length - 1;
     render();
   };
   btnClear.onclick = () => {
     shapes = [];
+    selected = -1;
     render();
+  };
+  btnDelete.onclick = () => {
+    if (selected >= 0 && selected < shapes.length) {
+      shapes.splice(selected, 1);
+      selected = -1;
+      render();
+    }
   };
   btnCancel.onclick = close;
   btnApply.onclick = () => {
