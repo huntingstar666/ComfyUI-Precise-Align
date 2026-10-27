@@ -150,21 +150,87 @@ function injectStyle() {
 // editor
 // ---------------------------------------------------------------------------
 
-function openEditor(node) {
+function waitForPreview(node, timeoutMs = 20000) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (imgs) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        api.removeEventListener("executed", onExecutedEvt);
+      } catch (e) {
+        /* ignore */
+      }
+      resolve(imgs);
+    };
+    const onExecutedEvt = (evt) => {
+      const d = evt?.detail || {};
+      const nid = d.display_node ?? d.node;
+      if (String(nid) !== String(node.id)) return;
+      const imgs = d.output?.images || d.images;
+      if (Array.isArray(imgs) && imgs.length) {
+        node._paImages = imgs;
+        finish(imgs);
+      }
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    try {
+      api.addEventListener("executed", onExecutedEvt);
+    } catch (e) {
+      /* ignore */
+    }
+  });
+}
+
+function showBusy(text) {
+  injectStyle();
+  const el = document.createElement("div");
+  el.className = "pa-overlay";
+  el.innerHTML = `<div class="pa-panel" style="padding:18px 24px;font-size:13px">${text}</div>`;
+  document.body.appendChild(el);
+  return () => el.remove();
+}
+
+async function ensureImageInfo(node) {
+  let info = findUpstreamImage(node);
+  if (info) return info;
+
+  // 没有直接可用的图：只执行本节点及上游，生成一次预览
+  console.log("[PreciseAlignRegion] no local image, queue partial execution for preview...");
+  const busy = showBusy("正在生成预览…（只执行本节点及上游）");
+  try {
+    const wait = waitForPreview(node);
+    await app.queuePrompt(-1, 1, { queueNodeIds: [String(node.id)] });
+    const imgs = await wait;
+    if (Array.isArray(imgs) && imgs.length) node._paImages = imgs;
+  } catch (e) {
+    console.warn("[PreciseAlignRegion] partial execution failed:", e);
+  } finally {
+    busy();
+  }
+  return findUpstreamImage(node);
+}
+
+async function openEditor(node) {
+  injectStyle();
   const widget = node.widgets?.find((w) => w.name === "shapes_json");
   if (!widget) {
     alert("Precise Align Region：找不到 shapes_json 控件。");
     return;
   }
-  const info = findUpstreamImage(node);
+  let info = findUpstreamImage(node);
+  if (!info) {
+    info = await ensureImageInfo(node);
+  }
   console.log("[PreciseAlignRegion] image info:", info, "paImages:", node._paImages);
   if (!info) {
     alert(
-      "没有可用的预览图。\n\n" +
+      "自动生成预览失败。\n\n" +
         "请确认：\n" +
         "1) 本节点的 image 输入已经接上图像；\n" +
-        "2) 点一次工作流的“运行”，让本节点生成预览（本节点是输出节点，会参与执行）。\n\n" +
-        "完成后重新点“✏️ 画框 / 画圈”。"
+        "2) 工作流可以正常执行（没有缺模型/报错）。\n\n" +
+        "也可以先点一次“运行”，再重新点“✏️ 画框 / 画圈”。"
     );
     return;
   }
