@@ -13,6 +13,11 @@
 所有尺寸都保证是 32 的倍数；resolution 统一输出 0。
 """
 
+import json
+import math
+import os
+import uuid
+
 import torch
 import torch.nn.functional as F
 
@@ -735,12 +740,134 @@ class PreciseAlignComposite:
         return (out,)
 
 
+def _rasterize_shapes(shapes_json, width, height):
+    """把编辑器写入的矩形/椭圆形状栅格化成遮罩，返回 (mask[1,H,W], bbox)。"""
+    mask = torch.zeros(1, height, width, dtype=torch.float32)
+    empty = (0, 0, 0, 0)
+    if not shapes_json or not str(shapes_json).strip():
+        return mask, empty
+    try:
+        data = json.loads(shapes_json)
+    except Exception:
+        print("[PreciseAlignRegion] WARNING: shapes_json 解析失败，输出空遮罩。")
+        return mask, empty
+
+    shapes = data.get("shapes") or []
+    if not isinstance(shapes, list) or not shapes:
+        return mask, empty
+
+    src_w = float(data.get("width") or width) or float(width)
+    src_h = float(data.get("height") or height) or float(height)
+    sx = width / src_w if src_w > 0 else 1.0
+    sy = height / src_h if src_h > 0 else 1.0
+
+    yy = torch.arange(height, dtype=torch.float32).view(-1, 1)
+    xx = torch.arange(width, dtype=torch.float32).view(1, -1)
+
+    for s in shapes:
+        if not isinstance(s, dict):
+            continue
+        try:
+            st = str(s.get("type", "rect")).lower()
+            x = float(s.get("x", 0.0)) * sx
+            y = float(s.get("y", 0.0)) * sy
+            w = float(s.get("w", 0.0)) * sx
+            h = float(s.get("h", 0.0)) * sy
+        except Exception:
+            continue
+        if w <= 0 or h <= 0:
+            continue
+        x1 = max(0, int(math.floor(x)))
+        y1 = max(0, int(math.floor(y)))
+        x2 = min(width, int(math.ceil(x + w)))
+        y2 = min(height, int(math.ceil(y + h)))
+        if x2 <= x1 or y2 <= y1:
+            continue
+
+        if st in ("ellipse", "circle", "oval"):
+            cx = (x1 + x2) / 2.0
+            cy = (y1 + y2) / 2.0
+            rx = max((x2 - x1) / 2.0, 0.5)
+            ry = max((y2 - y1) / 2.0, 0.5)
+            region = (((xx[:, x1:x2] - cx) / rx) ** 2 + ((yy[y1:y2, :] - cy) / ry) ** 2) <= 1.0
+            mask[0, y1:y2, x1:x2] = torch.maximum(mask[0, y1:y2, x1:x2], region.to(mask.dtype))
+        else:
+            mask[0, y1:y2, x1:x2] = 1.0
+
+    if float(mask.sum()) <= 0:
+        return mask, empty
+    ys, xs = torch.nonzero(mask[0] > 0.5, as_tuple=True)
+    bx, by = int(xs.min()), int(ys.min())
+    bw = int(xs.max()) - bx + 1
+    bh = int(ys.max()) - by + 1
+    return mask, (bx, by, bw, bh)
+
+
+def _save_preview_ui(image):
+    """把首帧存到 ComfyUI temp，供前端编辑器显示（失败则返回空 ui）。"""
+    try:
+        import folder_paths
+        import numpy as np
+        from PIL import Image
+
+        arr = image[0].detach().cpu().clamp(0.0, 1.0).numpy()
+        if arr.ndim == 2:
+            arr = np.stack([arr] * 3, axis=-1)
+        arr = (arr[..., :3] * 255.0).round().astype("uint8")
+        name = f"precise_region_{uuid.uuid4().hex[:12]}.png"
+        path = os.path.join(folder_paths.get_temp_directory(), name)
+        Image.fromarray(arr).save(path, compress_level=1)
+        return {"images": [{"filename": name, "subfolder": "", "type": "temp"}]}
+    except Exception as exc:
+        print(f"[PreciseAlignRegion] 预览图生成失败：{exc}")
+        return {}
+
+
+class PreciseAlignRegion:
+    """R-1：在图像上画矩形/椭圆，输出遮罩与包围盒。"""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE", {"tooltip": "原始图像；画框/画圈基于这张图"}),
+                "shapes_json": ("STRING", {"default": "", "multiline": False,
+                                           "tooltip": "由节点的“画框 / 画圈”编辑器写入，请勿手动修改"}),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK", "INT", "INT", "INT", "INT")
+    RETURN_NAMES = ("image", "mask", "box_x", "box_y", "box_w", "box_h")
+    OUTPUT_TOOLTIPS = (
+        "原图（透传，方便继续接其他节点）",
+        "按形状生成的遮罩（原图尺寸；可接 Pad / Crop Edit 的 mask 输入）",
+        "形状包围盒左上角 X",
+        "形状包围盒左上角 Y",
+        "包围盒宽度",
+        "包围盒高度",
+    )
+    SEARCH_ALIASES = ["region", "draw box", "draw circle", "画框", "画圈", "mask draw"]
+    FUNCTION = "run"
+    CATEGORY = CATEGORY
+    DESCRIPTION = "在图像上画矩形/椭圆，输出遮罩与包围盒；遮罩可接 Precise Align Pad / Crop Edit 的 mask 输入。"
+
+    def run(self, image, shapes_json):
+        h, w = int(image.shape[1]), int(image.shape[2])
+        mask, (bx, by, bw, bh) = _rasterize_shapes(shapes_json, w, h)
+        ui = _save_preview_ui(image)
+        has = float(mask.sum()) > 0
+        print(f"[PreciseAlignRegion] {w}x{h} shapes={'yes' if has else 'no'} "
+              f"bbox=({bx},{by},{bw},{bh})")
+        return {"ui": ui, "result": (image, mask, bx, by, bw, bh)}
+
+
 NODE_CLASS_MAPPINGS = {
     "PreciseAlignPad": PreciseAlignPad,
     "PreciseAlignCropBack": PreciseAlignCropBack,
     "PreciseAlignCropEdit": PreciseAlignCropEdit,
     "PreciseAlignStitch": PreciseAlignStitch,
     "PreciseAlignComposite": PreciseAlignComposite,
+    "PreciseAlignRegion": PreciseAlignRegion,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -749,4 +876,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "PreciseAlignComposite": "Precise Align · Composite",
     "PreciseAlignCropEdit": "Precise Align · Crop Edit",
     "PreciseAlignStitch": "Precise Align · Stitch",
+    "PreciseAlignRegion": "Precise Align · Region (画框/画圈)",
 }

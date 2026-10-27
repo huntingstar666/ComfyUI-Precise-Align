@@ -135,6 +135,19 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 输入 `original_image`、`edited_image`（解码结果）、`crop_info`；可选 `mask`（接 B-1）、`blend_pixels`（默认 16）、`upscale_method`、`curve`（默认 `smoothstep`）、`color_match`、`color_strength`。
 输出贴回后的整图。`color_match` 用裁切块边缘的过渡带做颜色校正，贴回前先把色调拉回原图。
 
+#### R-1. 画框 / 画圈 (Region)
+
+自带形状编辑器，不依赖官方遮罩编辑器（官方只有画笔/橡皮）。
+
+1. 添加 **Precise Align · Region (画框/画圈)**，`image` 接原图；
+2. 先运行一次节点（生成预览图）；
+3. 点击节点上的 **✏️ 画框 / 画圈** 按钮（或右键菜单）；
+4. 在弹窗里用「矩形 / 圆形」拖动绘制，可多个形状，支持撤销/清空/Ctrl+Z；
+5. 点「应用」写回形状，再运行节点，输出 `mask` 与包围盒 `box_x/y/w/h`。
+
+输出 `mask` 直接接 **Pad / Crop Edit 的 `mask` 输入**即可；`image` 是透传，方便串在链路里。
+遮罩坐标按原图记录，节点内部会随缩放/补边自动映射。
+
 ---
 
 ## 标准连线
@@ -184,7 +197,8 @@ KSampler → VAE Decode → B-2 Stitch Back（+ 原图）
 
 ## 框选/遮罩从哪来
 
-- **ComfyUI 自带 MaskEditor**：右键 LoadImage → 打开遮罩编辑器 → 矩形/画笔 → 保存，mask 接 A-1/B-1；
+- **本包自带编辑器（推荐）**：`Precise Align · Region` → 先运行一次 → 点「✏️ 画框 / 画圈」→ 画矩形/椭圆 → 应用 → `mask` 接 Pad / Crop Edit；
+- **ComfyUI 自带 MaskEditor**：右键 LoadImage → 打开遮罩编辑器（只有画笔/橡皮）→ 涂抹 → 保存，mask 接 A-1/B-1；
 - **数字框**：直接填 `box_x/box_y/box_w/box_h`；
 - 也可以用 `Bounding Box` 原始节点读出四个数值，手动填入 `box_*`。
 - 自定义"弹窗红色选框"属于后续可选功能（需要写前端扩展），当前用以上方式即可。

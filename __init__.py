@@ -8,10 +8,13 @@ B. PreciseAlignCropBack   —— 按处理信息把解码结果精确裁回原�
 C. PreciseAlignComposite  —— 可选：把未编辑区域用原图像素合成回去
 D. PreciseAlignCropEdit   —— 方案 B：裁切编辑区 + 上下文
 E. PreciseAlignStitch     —— 方案 B：把裁切结果贴回原图
+F. PreciseAlignRegion     —— 画框/画圈生成遮罩与包围盒
 
 详细用法见 README.md。
 """
 
 from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+WEB_DIRECTORY = "./web"
+
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
