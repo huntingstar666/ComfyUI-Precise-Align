@@ -630,6 +630,7 @@ class PreciseAlignStitch:
         content = edited_image[:, top:top + sh, left:left + sw, :]
         if (sw, sh) != (cw, ch):
             content = _resize_bhwc(content, cw, ch, upscale_method)
+        content = _match_channels_like(content, original_image)
         content = content.to(device=original_image.device, dtype=original_image.dtype)
 
         if mask is not None:
@@ -671,6 +672,27 @@ class PreciseAlignStitch:
         return (out,)
 
 
+def _match_channels_like(image, like):
+    """把 image 的通道数对齐到 like：多则丢弃（如 RGBA→RGB），少则补 alpha=1。
+
+    Qwen-Image 2.1 的 VAE 输出 4 通道 RGBA，而 Load Image 通常是 3 通道 RGB，
+    直接比较 shape 会误报“尺寸不一致”。
+    """
+    if image.dim() != 4 or like.dim() != 4:
+        return image
+    c_from, c_to = int(image.shape[-1]), int(like.shape[-1])
+    if c_from == c_to:
+        return image
+    if c_from > c_to:
+        print(f"[PreciseAlign] WARNING: 图像有 {c_from} 通道，已丢弃 {c_from - c_to} 个通道"
+              f"以匹配原图（Qwen 2.1 VAE 输出 RGBA）")
+        return image[..., :c_to]
+    pad = c_to - c_from
+    ones = torch.ones_like(image[..., :1]).expand(*image.shape[:-1], pad)
+    print(f"[PreciseAlign] WARNING: 图像只有 {c_from} 通道，已补 {pad} 个 alpha=1 通道以匹配原图")
+    return torch.cat([image, ones], dim=-1)
+
+
 # ---------------------------------------------------------------------------
 # 合成（方案 A 收尾）
 # ---------------------------------------------------------------------------
@@ -706,12 +728,13 @@ class PreciseAlignComposite:
 
     def composite(self, original_image, edited_image, mask, invert_mask=False, feather=0,
                   curve="smoothstep", color_match=False, color_strength=0.8):
+        edited_image = _match_channels_like(edited_image, original_image)
         if original_image.shape != edited_image.shape:
-            ow, oh = int(original_image.shape[2]), int(original_image.shape[1])
-            ew, eh = int(edited_image.shape[2]), int(edited_image.shape[1])
+            ow, oh, oc = int(original_image.shape[2]), int(original_image.shape[1]), int(original_image.shape[-1])
+            ew, eh, ec = int(edited_image.shape[2]), int(edited_image.shape[1]), int(edited_image.shape[-1])
             raise ValueError(
-                f"PreciseAlignComposite: 尺寸不一致：original_image={ow}x{oh}，"
-                f"edited_image={ew}x{eh}。\n"
+                f"PreciseAlignComposite: 尺寸不一致：original_image={ow}x{oh}×{oc}ch，"
+                f"edited_image={ew}x{eh}×{ec}ch。\n"
                 "edited_image 必须接 Precise Align · Crop Back 的 image 输出（原图尺寸）；"
                 "original_image 必须接原图（Load Image）；"
                 "mask 建议接 Crop Back 的 mask 输出。\n"

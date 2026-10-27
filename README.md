@@ -237,6 +237,10 @@ B 方案 `mask_snap=on, expand=12, feather=24, blend_pixels=32, curve=smoothstep
 
 ---
 
+> **RGBA 说明**：Qwen-Image 2.1 的 VAE 解码输出是 **4 通道 RGBA**，而 Load Image 通常是 3 通道 RGB。
+> `Composite` / `Stitch` 会自动把编辑结果对齐到原图通道数（多则丢弃 alpha，少则补 alpha=1），
+> 控制台会打印 `[PreciseAlign] WARNING: ... 通道 ...`，不需要手动接转换节点。
+
 ## 边界
 
 | 维度 | 舒适 | 可用 | 不建议 |
