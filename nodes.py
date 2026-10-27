@@ -848,6 +848,7 @@ class PreciseAlignRegion:
     )
     SEARCH_ALIASES = ["region", "draw box", "draw circle", "画框", "画圈", "mask draw"]
     FUNCTION = "run"
+    OUTPUT_NODE = True
     CATEGORY = CATEGORY
     DESCRIPTION = "在图像上画矩形/椭圆，输出遮罩与包围盒；遮罩可接 Precise Align Pad / Crop Edit 的 mask 输入。"
 

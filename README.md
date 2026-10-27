@@ -148,6 +148,9 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 输出 `mask` 直接接 **Pad / Crop Edit 的 `mask` 输入**即可；`image` 是透传，方便串在链路里。
 遮罩坐标按原图记录，节点内部会随缩放/补边自动映射。
 
+> 如果提示“预览图加载失败”：确认 `image` 已接图，然后点一次工作区的“运行”（本节点是输出节点，会生成预览）。仍失败时按 F12 打开 Console，把 `[PreciseAlignRegion]` 开头的日志发出来。
+
+
 ---
 
 ## 标准连线

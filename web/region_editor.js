@@ -21,10 +21,53 @@ function viewUrl(info) {
   }
 }
 
+function normInfo(im) {
+  return infoFromImageLike(im);
+}
+
+function infoFromImageLike(im) {
+  if (!im) return null;
+  if (typeof im === "string") return fromWidgetValue(im);
+  if (im.filename) {
+    return { filename: im.filename, subfolder: im.subfolder || "", type: im.type || "temp" };
+  }
+  if (im.src) {
+    try {
+      const u = new URL(im.src, window.location.href);
+      const filename = u.searchParams.get("filename");
+      if (filename) {
+        return {
+          filename,
+          subfolder: u.searchParams.get("subfolder") || "",
+          type: u.searchParams.get("type") || "temp",
+        };
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+function fromWidgetValue(v) {
+  if (typeof v !== "string" || !v.trim()) return null;
+  const s = v.replace(/\\/g, "/");
+  const idx = s.lastIndexOf("/");
+  if (idx > 0) {
+    return { filename: s.slice(idx + 1), subfolder: s.slice(0, idx), type: "input" };
+  }
+  return { filename: s, subfolder: "", type: "input" };
+}
+
 function findUpstreamImage(node) {
   if (Array.isArray(node._paImages) && node._paImages.length) {
-    const im = node._paImages[node._paImages.length - 1];
-    return { filename: im.filename, subfolder: im.subfolder || "", type: im.type || "temp" };
+    const info = normInfo(node._paImages[node._paImages.length - 1]);
+    if (info) return info;
+  }
+  // node.imgs（部分前端会给带 ui.images 的节点自动挂上）
+  if (Array.isArray(node.imgs) && node.imgs.length) {
+    const info = infoFromImageLike(node.imgs[node.imgs.length - 1]);
+    if (info) return info;
   }
   let cur = node;
   for (let depth = 0; depth < 6; depth++) {
@@ -35,13 +78,16 @@ function findUpstreamImage(node) {
     const origin = cur.graph.getNodeById(link.origin_id);
     if (!origin) break;
     if (Array.isArray(origin.imgs) && origin.imgs.length) {
-      const im = origin.imgs[origin.imgs.length - 1];
-      return { filename: im.filename, subfolder: im.subfolder || "", type: im.type || "temp" };
+      const info = infoFromImageLike(origin.imgs[origin.imgs.length - 1]);
+      if (info) return info;
     }
-    const w = origin.widgets?.find(
-      (w) => w.name === "image" && typeof w.value === "string" && w.value.trim().length > 0
-    );
-    if (w) return { filename: w.value, subfolder: "", type: "input" };
+    for (const wname of ["image", "image_upload", "filename"]) {
+      const w = origin.widgets?.find(
+        (w) => w.name === wname && typeof w.value === "string" && w.value.trim().length > 0
+      );
+      const info = w ? fromWidgetValue(w.value) : null;
+      if (info) return info;
+    }
     cur = origin;
   }
   return null;
@@ -111,15 +157,42 @@ function openEditor(node) {
     return;
   }
   const info = findUpstreamImage(node);
+  console.log("[PreciseAlignRegion] image info:", info, "paImages:", node._paImages);
   if (!info) {
-    alert("没有可用的预览图。请先运行一次本节点（生成预览），或在前面连接 Load Image 后再试。");
+    alert(
+      "没有可用的预览图。\n\n" +
+        "请确认：\n" +
+        "1) 本节点的 image 输入已经接上图像；\n" +
+        "2) 点一次工作流的“运行”，让本节点生成预览（本节点是输出节点，会参与执行）。\n\n" +
+        "完成后重新点“✏️ 画框 / 画圈”。"
+    );
     return;
   }
-  const img = new Image();
-  img.onload = () => buildModal(node, widget, img);
-  img.onerror = () =>
-    alert("预览图加载失败：请先运行一次节点生成预览，或检查上游图像。");
-  img.src = viewUrl(info);
+
+  const candidates = [];
+  for (const t of [info.type || "temp", "input", "temp"]) {
+    if (!candidates.some((c) => c.type === t)) candidates.push({ ...info, type: t });
+  }
+  let idx = 0;
+  const tryNext = () => {
+    if (idx >= candidates.length) {
+      alert(
+        "预览图加载失败：\n" +
+          viewUrl(info) +
+          "\n\n请确认该图像仍然存在，或重新运行一次节点后再试。"
+      );
+      return;
+    }
+    const cand = candidates[idx++];
+    const img = new Image();
+    img.onload = () => buildModal(node, widget, img);
+    img.onerror = () => {
+      console.warn("[PreciseAlignRegion] preview load failed:", viewUrl(cand));
+      tryNext();
+    };
+    img.src = viewUrl(cand);
+  };
+  tryNext();
 }
 
 function buildModal(node, widget, img) {
@@ -366,6 +439,7 @@ app.registerExtension({
       onExecuted?.apply(this, arguments);
       if (Array.isArray(message?.images) && message.images.length) {
         this._paImages = message.images;
+        console.log("[PreciseAlignRegion] preview ready:", message.images);
       }
     };
 
