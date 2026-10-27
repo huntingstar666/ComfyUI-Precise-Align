@@ -16,6 +16,7 @@
 import json
 import math
 import os
+import re
 import time
 import uuid
 
@@ -836,11 +837,12 @@ def _rasterize_shapes(shapes_json, width, height):
     return mask, (bx, by, bw, bh)
 
 
-def _save_preview_ui(image):
+def _save_preview_ui(image, unique_id=None):
     """把首帧存到 output/precise_align_preview，供前端编辑器显示。
 
-    不再用 temp：ComfyUI 每次启动都会清空 temp，重启后旧预览 URL 会 404。
-    （失败则返回空 ui，不影响节点执行。）
+    - 按节点 id 命名（同一节点每次覆盖同一张，不会堆积）；
+    - 目录里最多保留 8 张，且删除超过 1 天的；
+    - 不用 temp：ComfyUI 每次启动都会清空 temp，重启后旧预览 URL 会 404。
     """
     try:
         import folder_paths
@@ -855,21 +857,25 @@ def _save_preview_ui(image):
         subfolder = "precise_align_preview"
         base = os.path.join(folder_paths.get_output_directory(), subfolder)
         os.makedirs(base, exist_ok=True)
-        name = f"precise_region_{uuid.uuid4().hex[:12]}.png"
+        if unique_id is not None:
+            safe = re.sub(r"[^A-Za-z0-9_-]", "_", str(unique_id))[:24]
+            name = f"precise_region_{safe}.png"
+        else:
+            name = f"precise_region_{uuid.uuid4().hex[:12]}.png"
         path = os.path.join(base, name)
         Image.fromarray(arr).save(path, compress_level=1)
 
-        # 简单清理：只保留最近 80 张，并删除 7 天前的
+        # 清理：目录最多 8 张，删除 1 天前的
         try:
             files = [f for f in os.listdir(base)
                      if f.startswith("precise_region_") and f.endswith(".png")]
             files.sort(key=lambda f: os.path.getmtime(os.path.join(base, f)))
-            for f in files[:-80]:
+            for f in files[:-8]:
                 os.remove(os.path.join(base, f))
             now = time.time()
-            for f in files[-80:]:
+            for f in files[-8:]:
                 p = os.path.join(base, f)
-                if now - os.path.getmtime(p) > 7 * 86400:
+                if now - os.path.getmtime(p) > 86400:
                     os.remove(p)
         except Exception:
             pass
@@ -891,6 +897,7 @@ class PreciseAlignRegion:
                 "shapes_json": ("STRING", {"default": "", "multiline": False,
                                            "tooltip": "由节点的“画框 / 画圈”编辑器写入，请勿手动修改"}),
             },
+            "hidden": {"unique_id": "UNIQUE_ID"},
         }
 
     RETURN_TYPES = ("IMAGE", "MASK", "INT", "INT", "INT", "INT")
@@ -909,10 +916,10 @@ class PreciseAlignRegion:
     CATEGORY = CATEGORY
     DESCRIPTION = "在图像上画矩形/椭圆，输出遮罩与包围盒；遮罩可接 Precise Align Pad / Crop Edit 的 mask 输入。"
 
-    def run(self, image, shapes_json):
+    def run(self, image, shapes_json, unique_id=None):
         h, w = int(image.shape[1]), int(image.shape[2])
         mask, (bx, by, bw, bh) = _rasterize_shapes(shapes_json, w, h)
-        ui = _save_preview_ui(image)
+        ui = _save_preview_ui(image, unique_id)
         has = float(mask.sum()) > 0
         print(f"[PreciseAlignRegion] {w}x{h} shapes={'yes' if has else 'no'} "
               f"bbox=({bx},{by},{bw},{bh})")

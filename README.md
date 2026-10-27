@@ -150,7 +150,7 @@ ComfyUI/custom_nodes/ComfyUI-Precise-Align
 `box_x/y/w/h` 是联合包围盒，接上也无害，但 `mask` 优先（只接 image + mask 即可）。
 遮罩坐标按原图记录，节点内部会随缩放/补边自动映射。
 
-> 编辑器预览图保存在 `output/precise_align_preview/`（自动保留最近 80 张），不再受 ComfyUI 启动清理 temp 影响；若仍遇到旧预览失效，点按钮会自动**只执行本节点及上游**重新生成。
+> 编辑器预览图保存在 `output/precise_align_preview/`：**每个 Region 节点只保留 1 张**（按节点 id 覆盖），整个目录最多 8 张、超过 1 天自动删除，不会堆积。若仍遇到旧预览失效，点按钮会自动**只执行本节点及上游**重新生成。
 > 更新插件后请**重启 ComfyUI 并 Ctrl+F5 强刷**页面（前端 JS 已改名，控制台会打印 `[PreciseAlignRegion] editor build 1.0.8` 便于确认版本）。
 
 
