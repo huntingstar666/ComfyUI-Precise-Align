@@ -1,4 +1,4 @@
-﻿[project]
+[project]
 name = "comfyui-precise-align"
 version = "1.0.0"
 description = "Zero-offset local image editing for ComfyUI: pad-align, region mask, crop & stitch, color match (Qwen-Image 2.1 optimized)."

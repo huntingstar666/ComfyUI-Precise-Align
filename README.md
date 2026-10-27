@@ -1,4 +1,4 @@
-﻿# ComfyUI-Precise-Align
+# ComfyUI-Precise-Align
 
 通用的「补边对齐 + 局部编辑 + 裁回/贴回」工具包，同时对 **Qwen-Image 2.1** 的零偏移做了专门优化。
 
