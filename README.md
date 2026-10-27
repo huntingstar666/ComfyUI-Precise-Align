@@ -185,7 +185,7 @@ KSampler → VAE Decode → B-2 Stitch Back（+ 原图）
 
 - **ComfyUI 自带 MaskEditor**：右键 LoadImage → 打开遮罩编辑器 → 矩形/画笔 → 保存，mask 接 A-1/B-1；
 - **数字框**：直接填 `box_x/box_y/box_w/box_h`；
-- B-1 也支持接 `Bounding Box` 原始节点（当四个 int 用）。
+- 也可以用 `Bounding Box` 原始节点读出四个数值，手动填入 `box_*`。
 - 自定义"弹窗红色选框"属于后续可选功能（需要写前端扩展），当前用以上方式即可。
 
 ---
@@ -199,7 +199,7 @@ KSampler → VAE Decode → B-2 Stitch Back（+ 原图）
 
 ---
 
-## 接缝优化（本次新增）
+## 接缝优化
 
 1. **框边对齐**：`mask_snap=true`（默认）会把框选矩形向外对齐到步长网格（Qwen 2.1 用 32），避免 latent 半格硬边。
 2. **羽化**：`mask_feather` 已改为**高斯羽化**（可分离卷积），比盒式模糊平滑，不会出现线性渐变带；
